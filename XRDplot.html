@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XRD (.xy) Multi-Data Plotter</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --card: #ffffff;
+      --border: #dce2ea;
+      --text: #1e293b;
+      --muted: #64748b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Meiryo", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    button, .btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    button:hover, .btn:hover {
+      background: #f1f5f9;
+    }
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    button.primary:hover {
+      background: var(--accent-hover);
+    }
+    button.danger:hover {
+      background: #fee2e2;
+      border-color: #fca5a5;
+      color: #b91c1c;
+    }
+    .main-container {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 16px;
+      padding: 16px;
+      flex: 1;
+    }
+    @media (max-width: 900px) {
+      .main-container {
+        grid-template-columns: 1fr;
+      }
+    }
+    .sidebar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-height: calc(100vh - 86px);
+      overflow-y: auto;
+    }
+    .dropzone {
+      border: 2px dashed #94a3b8;
+      border-radius: 8px;
+      padding: 16px 12px;
+      text-align: center;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: #eff6ff;
+    }
+    .dropzone p {
+      margin: 4px 0;
+      font-size: 0.85rem;
+    }
+    .dropzone .hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .section-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .offset-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .offset-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+    }
+    .offset-row input[type="number"] {
+      width: 110px;
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 0.85rem;
+    }
+    .dataset-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .dataset-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .dataset-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .dataset-name-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      flex: 1;
+    }
+    .color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dataset-name {
+      font-size: 0.83rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dataset-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .dataset-controls input[type="number"] {
+      width: 105px;
+      padding: 3px 6px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+    .plot-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      min-height: 540px;
+    }
+    #plot {
+      width: 100%;
+      height: 100%;
+      min-height: 520px;
+      flex: 1;
+    }
+    .zoom-guide {
+      font-size: 0.78rem;
+      color: var(--muted);
+      padding: 4px 8px 0;
+    }
+    .icon-btn {
+      padding: 2px 7px;
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>XRD (.xy) マルチデータプロッター</h1>
+    <div class="header-actions">
+      <button id="zoomInBtn" title="ズームイン">🔍＋ ズームイン</button>
+      <button id="zoomOutBtn" title="ズームアウト">🔍－ ズームアウト</button>
+      <button id="resetZoomBtn" title="全体表示に戻す">↺ リセット</button>
+      <button id="clearAllBtn" class="danger" title="全データ削除">すべて削除</button>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <aside class="sidebar">
+      <div>
+        <div class="section-title">1. .xy ファイル読み込み（複数可）</div>
+        <div id="dropzone" class="dropzone">
+          <p><strong>クリックして選択</strong> または <strong>ドラッグ＆ドロップ</strong></p>
+          <p class="hint">.xy / .txt 対応（1列目: 2θ, 2列目: Intensity, 3列目: ESD）</p>
+          <input type="file" id="fileInput" accept=".xy,.txt,text/plain" multiple hidden />
+        </div>
+      </div>
+
+      <div class="offset-box">
+        <div class="section-title" style="margin-bottom: 0;">3. 縦方向オフセット設定</div>
+        <div class="offset-row">
+          <label for="stepOffsetInput">等間隔ステップ:</label>
+          <input type="number" id="stepOffsetInput" value="0" step="any" />
+          <button id="applyStepBtn" class="primary icon-btn">一括適用</button>
+        </div>
+        <div class="offset-row">
+          <button id="zeroOffsetBtn" class="icon-btn">すべて 0（重ね書き）</button>
+          <span class="hint" style="font-size: 0.74rem; color: var(--muted);">各ファイル毎の微調整も可能</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">
+          <span>読み込んだデータ (<span id="dataCount">0</span>)</span>
+        </div>
+        <div id="datasetList" class="dataset-list"></div>
+      </div>
+    </aside>
+
+    <main class="plot-panel">
+      <div id="plot"></div>
+      <div class="zoom-guide">
+        操作ヒント：グラフ上で<strong>ドラッグ範囲指定</strong>で拡大、<strong>マウスホイール</strong>でズームイン/アウト、<strong>ダブルクリック</strong>で全体表示に戻ります。
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const PALETTE = [
+      '#2563eb', '#dc2626', '#059669', '#d97706', '#7c3aed',
+      '#0891b2', '#db2777', '#4f46e5', '#65a30d', '#ea580c'
+    ];
+
+    let datasets = []; // { id, name, color, visible, offset, x, y }
+    let nextId = 1;
+
+    const fileInput = document.getElementById('fileInput');
+    const dropzone = document.getElementById('dropzone');
+    const datasetList = document.getElementById('datasetList');
+    const dataCount = document.getElementById('dataCount');
+    const stepOffsetInput = document.getElementById('stepOffsetInput');
+    const applyStepBtn = document.getElementById('applyStepBtn');
+    const zeroOffsetBtn = document.getElementById('zeroOffsetBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const resetZoomBtn = document.getElementById('resetZoomBtn');
+
+    // .xy テキストパース（1列目: 2theta, 2列目: intensity, 3列目以降は無視）
+    function parseXYText(text) {
+      const x = [];
+      const y = [];
+      const lines = text.split(/\r?\n/);
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith('#') || line.startsWith('!')) continue;
+        const parts = line.split(/[\s,;]+/);
+        if (parts.length < 2) continue;
+        const twoTheta = parseFloat(parts[0]);
+        const intensity = parseFloat(parts[1]);
+        if (!Number.isNaN(twoTheta) && !Number.isNaN(intensity)) {
+          x.push(twoTheta);
+          y.push(intensity);
+        }
+      }
+      return { x, y };
+    }
+
+    async function handleFiles(fileList) {
+      const files = Array.from(fileList);
+      if (!files.length) return;
+
+      for (const file of files) {
+        const text = await file.text();
+        const parsed = parseXYText(text);
+        if (parsed.x.length === 0) {
+          alert(`"${file.name}" から有効な数値データを読み込めませんでした。`);
+          continue;
+        }
+        const color = PALETTE[(nextId - 1) % PALETTE.length];
+        datasets.push({
+          id: nextId++,
+          name: file.name,
+          color,
+          visible: true,
+          offset: 0,
+          x: parsed.x,
+          y: parsed.y
+        });
+      }
+
+      renderSidebar();
+      renderPlot();
+    }
+
+    function renderSidebar() {
+      dataCount.textContent = datasets.length;
+      datasetList.innerHTML = '';
+
+      if (datasets.length === 0) {
+        datasetList.innerHTML = '<div style="font-size:0.8rem; color:var(--muted);">データがありません。</div>';
+        return;
+      }
+
+      datasets.forEach((ds) => {
+        const card = document.createElement('div');
+        card.className = 'dataset-card';
+
+        const top = document.createElement('div');
+        top.className = 'dataset-top';
+
+        const nameWrap = document.createElement('div');
+        nameWrap.className = 'dataset-name-wrap';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = ds.visible;
+        checkbox.title = '表示/非表示';
+        checkbox.addEventListener('change', () => {
+          ds.visible = checkbox.checked;
+          renderPlot();
+        });
+
+        const dot = document.createElement('span');
+        dot.className = 'color-dot';
+        dot.style.background = ds.color;
+
+        const title = document.createElement('span');
+        title.className = 'dataset-name';
+        title.textContent = ds.name;
+        title.title = ds.name;
+
+        nameWrap.append(checkbox, dot, title);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'icon-btn danger';
+        delBtn.textContent = '×';
+        delBtn.title = 'このデータを削除';
+        delBtn.addEventListener('click', () => {
+          datasets = datasets.filter((item) => item.id !== ds.id);
+          renderSidebar();
+          renderPlot();
+        });
+
+        top.append(nameWrap, delBtn);
+
+        const controls = document.createElement('div');
+        controls.className = 'dataset-controls';
+
+        const offsetLabel = document.createElement('label');
+        offsetLabel.textContent = 'オフセット: ';
+
+        const offsetInput = document.createElement('input');
+        offsetInput.type = 'number';
+        offsetInput.step = 'any';
+        offsetInput.value = ds.offset;
+        offsetInput.addEventListener('input', () => {
+          const val = parseFloat(offsetInput.value);
+          ds.offset = Number.isNaN(val) ? 0 : val;
+          renderPlot();
+        });
+
+        offsetLabel.appendChild(offsetInput);
+        controls.append(offsetLabel);
+
+        card.append(top, controls);
+        datasetList.appendChild(card);
+      });
+    }
+
+    function buildTraces() {
+      return datasets
+        .filter((ds) => ds.visible)
+        .map((ds) => ({
+          type: 'scatter',
+          mode: 'lines',
+          name: ds.offset !== 0 ? `${ds.name} (+${ds.offset})` : ds.name,
+          x: ds.x,
+          y: ds.y.map((val) => val + ds.offset),
+          line: {
+            color: ds.color,
+            width: 1.6
+          },
+          hovertemplate:
+            `<b>${ds.name}</b><br>` +
+            `2θ: %{x:.5f}°<br>` +
+            `Intensity (shifted): %{y:.5f}<extra></extra>`
+        }));
+    }
+
+    function getPlotLayout() {
+      return {
+        xaxis: {
+          title: { text: '2θ (deg)', font: { size: 13 } },
+          zeroline: false,
+          showgrid: true,
+          gridcolor: '#e2e8f0'
+        },
+        yaxis: {
+          title: { text: 'Intensity (a.u.)', font: { size: 13 } },
+          zeroline: false,
+          showgrid: true,
+          gridcolor: '#e2e8f0'
+        },
+        margin: { t: 24, r: 20, b: 50, l: 65 },
+        legend: {
+          orientation: 'h',
+          y: 1.08,
+          x: 0
+        },
+        hovermode: 'closest'
+      };
+    }
+
+    function getPlotConfig() {
+      return {
+        responsive: true,
+        scrollZoom: true,
+        displaylogo: false,
+        modeBarButtonsToAdd: ['toImage'],
+        toImageButtonOptions: {
+          format: 'png',
+          filename: 'xrd_plot',
+          scale: 2
+        }
+      };
+    }
+
+    function renderPlot() {
+      const plotDiv = document.getElementById('plot');
+      const traces = buildTraces();
+      Plotly.react(plotDiv, traces, getPlotLayout(), getPlotConfig());
+    }
+
+    // ズームイン・ズームアウト・リセット（GUIボタン）
+    function zoomAxis(factor) {
+      const plotDiv = document.getElementById('plot');
+      const layout = plotDiv._fullLayout;
+      if (!layout || !layout.xaxis || !layout.yaxis) return;
+
+      const xRange = layout.xaxis.range;
+      const yRange = layout.yaxis.range;
+      if (!xRange || !yRange) return;
+
+      const zoomRange = ([min, max], f) => {
+        const center = (min + max) / 2;
+        const halfSpan = ((max - min) / 2) * f;
+        return [center - halfSpan, center + halfSpan];
+      };
+
+      Plotly.relayout(plotDiv, {
+        'xaxis.range': zoomRange(xRange, factor),
+        'yaxis.range': zoomRange(yRange, factor)
+      });
+    }
+
+    zoomInBtn.addEventListener('click', () => zoomAxis(0.7));
+    zoomOutBtn.addEventListener('click', () => zoomAxis(1 / 0.7));
+    resetZoomBtn.addEventListener('click', () => {
+      const plotDiv = document.getElementById('plot');
+      Plotly.relayout(plotDiv, {
+        'xaxis.autorange': true,
+        'yaxis.autorange': true
+      });
+    });
+
+    // オフセット一括適用 / リセット
+    applyStepBtn.addEventListener('click', () => {
+      const step = parseFloat(stepOffsetInput.value) || 0;
+      datasets.forEach((ds, idx) => {
+        ds.offset = idx * step;
+      });
+      renderSidebar();
+      renderPlot();
+    });
+
+    zeroOffsetBtn.addEventListener('click', () => {
+      stepOffsetInput.value = 0;
+      datasets.forEach((ds) => {
+        ds.offset = 0;
+      });
+      renderSidebar();
+      renderPlot();
+    });
+
+    clearAllBtn.addEventListener('click', () => {
+      datasets = [];
+      nextId = 1;
+      renderSidebar();
+      renderPlot();
+    });
+
+    // ファイル選択・ドラッグ＆ドロップ
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      handleFiles(e.target.files);
+      fileInput.value = '';
+    });
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    // 初期描画
+    renderSidebar();
+    renderPlot();
+  </script>
+</body>
+</html>
